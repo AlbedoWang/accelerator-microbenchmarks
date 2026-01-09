@@ -14,13 +14,14 @@ from jax.sharding import PartitionSpec as P
 
 # pylint: disable=g-importing-member
 
+LOCAL_MESH = True
 
-def create_mesh(dcn_size: int, ici_size: int) -> tuple[Mesh, list[int], list[int]]:
+def create_local_mesh(dcn_size: int, ici_size: int) -> tuple[Mesh, list[int], list[int]]:
     """Creates a hybrid mesh with the given DCN and ICI sizes."""
     dcn_parallelism = [dcn_size, 1]
     ici_parallelism = [1, ici_size]
 
-    total_devices = jax.device_count()
+    total_devices = jax.local_device_count()
     if total_devices != (dcn_size * ici_size):
         raise ValueError(
             f"Need {dcn_size * ici_size} devices, but found {total_devices}"
@@ -32,6 +33,29 @@ def create_mesh(dcn_size: int, ici_size: int) -> tuple[Mesh, list[int], list[int
         mesh = Mesh(mesh_devices, ("dcn", "ici"))
     else:
         mesh_devices = mesh_utils.create_device_mesh([ici_size], devices=jax.local_devices())
+        mesh = Mesh(mesh_devices, "ici")
+    return mesh
+
+def create_mesh(dcn_size: int, ici_size: int) -> tuple[Mesh, list[int], list[int]]:
+    """Creates a hybrid mesh with the given DCN and ICI sizes."""
+    if LOCAL_MESH:
+        return create_local_mesh(dcn_size, ici_size)
+    
+    dcn_parallelism = [dcn_size, 1]
+    ici_parallelism = [1, ici_size]
+
+    total_devices = jax.device_count()
+    if total_devices != (dcn_size * ici_size):
+        raise ValueError(
+            f"Need {dcn_size * ici_size} devices, but found {total_devices}"
+        )
+    if dcn_size > 1:
+        mesh_devices = mesh_utils.create_hybrid_device_mesh(
+            ici_parallelism, dcn_parallelism, devices=jax.devices()
+        )
+        mesh = Mesh(mesh_devices, ("dcn", "ici"))
+    else:
+        mesh_devices = mesh_utils.create_device_mesh([ici_size], devices=jax.devices())
         mesh = Mesh(mesh_devices, "ici")
     return mesh
 

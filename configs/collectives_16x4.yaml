@@ -1,0 +1,40 @@
+benchmarks:
+- benchmark_name: psum
+  benchmark_params:
+  - {matrix_dim: 4096, dtype: "bfloat16", dcn_size: 16, ici_size: 4, num_runs: 3}
+  warmup_tries: 5
+  trace_dir: "/tmp/microbenchmarks/collectives"
+  csv_path: "/tmp/microbenchmarks/collectives"
+  xla_dump_dir: "/tmp/microbenchmarks/collective/hlo_graphs"
+
+- benchmark_name: all_gather
+  benchmark_params:
+  - {matrix_dim: 4096, dtype: "bfloat16", dcn_size: 16, ici_size: 4, num_runs: 3}
+  warmup_tries: 5
+  trace_dir: "/tmp/microbenchmarks/collectives"
+  csv_path: "/tmp/microbenchmarks/collectives"
+  xla_dump_dir: "/tmp/microbenchmarks/collective/hlo_graphs"
+
+- benchmark_name: psum_scatter
+  benchmark_params:
+  - {matrix_dim: 4096, dtype: "bfloat16", dcn_size: 16, ici_size: 4, num_runs: 3}
+  warmup_tries: 5
+  trace_dir: "/tmp/microbenchmarks/collectives"
+  csv_path: "/tmp/microbenchmarks/collectives"
+  xla_dump_dir: "/tmp/microbenchmarks/collective/hlo_graphs"
+
+- benchmark_name: all_to_all
+  benchmark_params:
+  - {matrix_dim: 4096, dtype: "bfloat16", dcn_size: 16, ici_size: 4, num_runs: 3}
+  warmup_tries: 5
+  trace_dir: "/tmp/microbenchmarks/collectives"
+  csv_path: "/tmp/microbenchmarks/collectives"
+  xla_dump_dir: "/tmp/microbenchmarks/collective/hlo_graphs"
+
+- benchmark_name: ppermute
+  benchmark_params:
+  - {matrix_dim: 4096, dtype: "bfloat16", dcn_size: 16, ici_size: 4, num_runs: 3}
+  warmup_tries: 5
+  trace_dir: "/tmp/microbenchmarks/collectives"
+  csv_path: "/tmp/microbenchmarks/collectives"
+  xla_dump_dir: "/tmp/microbenchmarks/collective/hlo_graphs"

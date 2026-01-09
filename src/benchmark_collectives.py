@@ -18,9 +18,16 @@ from jax.sharding import PartitionSpec as P
 LOCAL_MESH = True
 
 
-def _global_ids_for_mesh(devices: list[jax.Device], mesh_shape: tuple[int, ...]) -> np.ndarray:
-    """Compute global device ids reshaped to the provided mesh shape."""
-    return np.array([device.id for device in devices]).reshape(mesh_shape)
+def _global_ids_for_mesh(mesh_shape: tuple[int, ...]) -> np.ndarray:
+    """Use logical 0..N-1 ids reshaped to the mesh shape.
+
+    Some TPU hosts expose device ids offset by a global base (e.g., 8-11). Using
+    contiguous logical ids keeps replica groups aligned with the mesh size (0..N-1)
+    and avoids RET_CHECK failures from unexpected device ids.
+    """
+
+    mesh_size = int(np.prod(mesh_shape))
+    return np.arange(mesh_size).reshape(mesh_shape)
 
 
 def _create_mesh_with_global_ids(
@@ -39,7 +46,7 @@ def _create_mesh_with_global_ids(
     device ids in the mesh device assignment to avoid those crashes.
     """
 
-    global_ids = _global_ids_for_mesh(devices, mesh_shape)
+    global_ids = _global_ids_for_mesh(mesh_shape)
 
     try:
         if use_hybrid:

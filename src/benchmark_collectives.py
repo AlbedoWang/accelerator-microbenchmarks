@@ -6,6 +6,7 @@ from typing import Any, Dict, Tuple
 
 from benchmark_utils import simple_timeit, MetricsStatistics
 import jax
+import numpy as np
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 import jax.numpy as jnp
@@ -15,6 +16,59 @@ from jax.sharding import PartitionSpec as P
 # pylint: disable=g-importing-member
 
 LOCAL_MESH = True
+
+
+def _global_ids_for_mesh(devices: list[jax.Device], mesh_shape: tuple[int, ...]) -> np.ndarray:
+    """Compute global device ids reshaped to the provided mesh shape."""
+    return np.array([device.id for device in devices]).reshape(mesh_shape)
+
+
+def _create_mesh_with_global_ids(
+    mesh_shape: tuple[int, ...],
+    *,
+    devices: list[jax.Device],
+    use_hybrid: bool,
+    dcn_parallelism: list[int],
+    ici_parallelism: list[int],
+) -> Mesh:
+    """Create a Mesh while preserving global device ids.
+
+    Some TPU slices enumerate local device ids starting at a global offset (e.g. 8,
+    9, 10, 11). If we let JAX auto-number devices 0..N-1, collectives can fail
+    with replica-group id mismatches. Supplying `global_ids` keeps the original
+    device ids in the mesh device assignment to avoid those crashes.
+    """
+
+    global_ids = _global_ids_for_mesh(devices, mesh_shape)
+
+    try:
+        if use_hybrid:
+            mesh_devices = mesh_utils.create_hybrid_device_mesh(
+                ici_parallelism,
+                dcn_parallelism,
+                devices=devices,
+                global_ids=global_ids,
+            )
+        else:
+            mesh_devices = mesh_utils.create_device_mesh(
+                mesh_shape,
+                devices=devices,
+                global_ids=global_ids,
+            )
+    except TypeError:
+        # Fallback for older JAX versions that do not support `global_ids`.
+        if use_hybrid:
+            mesh_devices = mesh_utils.create_hybrid_device_mesh(
+                ici_parallelism,
+                dcn_parallelism,
+                devices=devices,
+            )
+        else:
+            mesh_devices = mesh_utils.create_device_mesh(mesh_shape, devices=devices)
+
+    axis_names = ("dcn", "ici") if use_hybrid else "ici"
+    return Mesh(mesh_devices, axis_names)
+
 
 def create_local_mesh(dcn_size: int, ici_size: int) -> tuple[Mesh, list[int], list[int]]:
     """Creates a hybrid mesh with the given DCN and ICI sizes."""
@@ -26,14 +80,28 @@ def create_local_mesh(dcn_size: int, ici_size: int) -> tuple[Mesh, list[int], li
         raise ValueError(
             f"Need {dcn_size * ici_size} devices, but found {total_devices}"
         )
+
+    devices = list(jax.local_devices())
+
     if dcn_size > 1:
-        mesh_devices = mesh_utils.create_hybrid_device_mesh(
-            ici_parallelism, dcn_parallelism, devices=jax.local_devices()
+        mesh_shape = (dcn_size, ici_size)
+        mesh = _create_mesh_with_global_ids(
+            mesh_shape,
+            devices=devices,
+            use_hybrid=True,
+            dcn_parallelism=dcn_parallelism,
+            ici_parallelism=ici_parallelism,
         )
-        mesh = Mesh(mesh_devices, ("dcn", "ici"))
     else:
-        mesh_devices = mesh_utils.create_device_mesh([ici_size], devices=jax.local_devices())
-        mesh = Mesh(mesh_devices, "ici")
+        mesh_shape = (ici_size,)
+        mesh = _create_mesh_with_global_ids(
+            mesh_shape,
+            devices=devices,
+            use_hybrid=False,
+            dcn_parallelism=dcn_parallelism,
+            ici_parallelism=ici_parallelism,
+        )
+
     return mesh
 
 def create_mesh(dcn_size: int, ici_size: int) -> tuple[Mesh, list[int], list[int]]:

@@ -27,11 +27,11 @@ def create_mesh(dcn_size: int, ici_size: int) -> tuple[Mesh, list[int], list[int
         )
     if dcn_size > 1:
         mesh_devices = mesh_utils.create_hybrid_device_mesh(
-            ici_parallelism, dcn_parallelism, devices=jax.devices()
+            ici_parallelism, dcn_parallelism, devices=jax.local_devices()
         )
         mesh = Mesh(mesh_devices, ("dcn", "ici"))
     else:
-        mesh_devices = mesh_utils.create_device_mesh([ici_size], devices=jax.devices())
+        mesh_devices = mesh_utils.create_device_mesh([ici_size], devices=jax.local_devices())
         mesh = Mesh(mesh_devices, "ici")
     return mesh
 
